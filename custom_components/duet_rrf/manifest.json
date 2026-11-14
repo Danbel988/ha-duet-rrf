@@ -1,7 +1,7 @@
 {
   "domain": "duet_rrf",
   "name": "Duet RepRapFirmware",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "config_flow": true,
   "documentation": "https://github.com/Danbel988/ha-duet-rrf",
   "issue_tracker": "https://github.com/Danbel988/ha-duet-rrf/issues",

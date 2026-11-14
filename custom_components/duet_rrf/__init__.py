@@ -25,14 +25,37 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         update_interval=timedelta(seconds=cfg.get(CONF_SCAN, DEFAULT_SCAN)))
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = {'client': client, 'coordinator': coordinator, 'control': cfg.get(CONF_CONTROL, False)}
-    # Retire only legacy 0.1.x entities with known unique IDs.
-    # New dynamic heater entities are not touched.
+    # Migrate obsolete fixed sensors without touching dynamic heater entities.
     registry = er.async_get(hass)
-    legacy_keys = ('bed_actual', 'bed_target', 'nozzle_actual', 'nozzle_target', 'plate_offset')
-    for key in legacy_keys:
+    for key in ('bed_actual', 'bed_target', 'nozzle_actual', 'nozzle_target', 'plate_offset'):
         entity_id = registry.async_get_entity_id('sensor', DOMAIN, f'{entry.entry_id}_{key}')
         if entity_id:
             registry.async_remove(entity_id)
+
+    # Preserve original X/Y/Z entity IDs for existing dashboards where possible.
+    # First move the old unique ID to the new dynamic axis unique ID. If the
+    # dynamic entity already exists, remove only the stale legacy entity and
+    # assign its old entity_id to the dynamic one.
+    axes = (coordinator.data or {}).get('move', {}).get('axes') or []
+    for index, axis in enumerate(axes):
+        if not isinstance(axis, dict):
+            continue
+        letter = str(axis.get('letter') or '').lower()
+        if letter not in ('x', 'y', 'z'):
+            continue
+        legacy_id = registry.async_get_entity_id('sensor', DOMAIN, f'{entry.entry_id}_{letter}')
+        if not legacy_id:
+            continue
+        dynamic_id = registry.async_get_entity_id('sensor', DOMAIN, f'{entry.entry_id}_axis_{index}')
+        if dynamic_id:
+            registry.async_remove(legacy_id)
+            # A dashboard might already use the new *_2 ID. Only rename if
+            # the old entity ID is available; no unrelated entity is touched.
+            if registry.async_get(legacy_id) is None:
+                registry.async_update_entity(dynamic_id, new_entity_id=legacy_id)
+        else:
+            # Reuse the old registry entry; the dynamic entity will bind to it.
+            registry.async_update_entity(legacy_id, new_unique_id=f'{entry.entry_id}_axis_{index}')
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(async_update_options))
     return True

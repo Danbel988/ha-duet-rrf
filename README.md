@@ -1,4 +1,4 @@
-# Duet RepRapFirmware for Home Assistant — v0.2.1 (pre-release)
+# Duet RepRapFirmware for Home Assistant — v0.2.2 (pre-release)
 
 A printer-model-independent, read-only Home Assistant integration for
 RepRapFirmware 3 in standalone HTTP mode. This is a community project,
@@ -13,7 +13,7 @@ Newly discovered hardware is added on subsequent coordinator updates.
 Entity identifiers are based on RRF array indices, so reordering firmware
 hardware may require checking dashboard entity references.
 
-## v0.2.1 changes
+## v0.2.2 changes
 - Retires legacy fixed Bed/Nozzle and custom build-plate-offset entities
   from the Home Assistant entity registry during integration setup.
   Existing dashboards referring to those entities may need to be updated.
@@ -40,3 +40,8 @@ After updating, restart Home Assistant. Existing config entries are retained.
 
 ## Source
 https://github.com/Danbel988/ha-duet-rrf
+
+## v0.2.2 additional fixes
+- Migrate legacy X/Y/Z entities to dynamic axis sensors, preserving original entity IDs where possible.
+- Publish a normal GitHub release (not pre-release) so Marketplace can prefer semantic version tags.
+- Retain existing v0.2.1 sensor and tachometer fixes.
