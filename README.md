@@ -1,6 +1,11 @@
-# Duet RepRapFirmware for Home Assistant — v0.3.0 (release candidate; hardware test pending)
+# Duet RepRapFirmware for Home Assistant — v0.3.1 (bugfix; hardware test pending)
 
 **Standalone RepRapFirmware 3 only.** SBC/DSF is intentionally out of scope.
+
+## v0.3.1 bugfix
+- Fix Home Assistant options reload failure: pass `hass` to `ConfigEntry.async_unload(hass)`.
+- Prevent `FAILED_UNLOAD` when changing integration options (e.g. enabling G-code).
+- Home Assistant restart is required to recover an entry already stuck in `FAILED_UNLOAD`.
 
 ## New in 0.3.0
 

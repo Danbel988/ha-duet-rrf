@@ -160,5 +160,5 @@ async def async_update_options(hass,entry):
 async def async_unload_entry(hass,entry):
     ok = await hass.config_entries.async_unload_platforms(entry,PLATFORMS)
     if ok:
-        entry.async_unload()
+        entry.async_unload(hass)
     return ok
