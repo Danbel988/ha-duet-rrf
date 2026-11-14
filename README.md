@@ -1,47 +1,67 @@
-# Duet RepRapFirmware for Home Assistant — v0.2.2 (pre-release)
+# Duet RepRapFirmware for Home Assistant — v0.3.0 (release candidate; hardware test pending)
 
-A printer-model-independent, read-only Home Assistant integration for
-RepRapFirmware 3 in standalone HTTP mode. This is a community project,
-not affiliated with Duet3D.
+**Standalone RepRapFirmware 3 only.** SBC/DSF is intentionally out of scope.
 
-## Dynamic discovery
-The integration discovers available RRF axes, heaters, temperature sensors,
-fans and tools from the firmware object model. It does not assume a specific
-printer brand, fixed hotend count or fixed bed/heater index.
+## New in 0.3.0
 
-Newly discovered hardware is added on subsequent coordinator updates.
-Entity identifiers are based on RRF array indices, so reordering firmware
-hardware may require checking dashboard entity references.
+- Additional print-job sensors: current layer, total layers, layers remaining, remaining time and raw extruded filament where available.
+- Independent opt-in switches for printer control, G-code console and LED lights in **Settings → Devices & services → Duet RepRapFirmware → Configure**.
+- LED lights use selected **logical RRF fan numbers**, not physical FAN connector labels. Configure e.g. `3,4` for two lights. The matching fans must already be configured in RRF (`M950`) and dedicated to lighting. **Do not use hotend or part-cooling fans as LEDs.** The integration never edits `config.g`.
+- HA actions: `duet_rrf.send_gcode`, `duet_rrf.printer_control`, `duet_rrf.list_macros`, `duet_rrf.run_macro`. Macro listing is top-level `0:/macros` only. Responses to G-code are best-effort and may be empty.
+- `duet-rrf-card` custom Lovelace card with grid-based layout, draggable block order in the editor, configurable width/height, HA entity values, cameras, smart plugs, macro buttons, G-code and control buttons.
 
-## v0.2.2 changes
-- Retires legacy fixed Bed/Nozzle and custom build-plate-offset entities
-  from the Home Assistant entity registry during integration setup.
-  Existing dashboards referring to those entities may need to be updated.
-- Negative RPM values (RRF's unavailable tachometer reading) now return
-  `unknown` rather than showing `-1 rpm`.
-- Preserves dynamic heater, sensor, axis, tool and fan discovery from v0.2.0.
-- Updates the manifest version to 0.2.1.
+## Install / upgrade
 
-## Install/update
-Install this repository as a custom HACS/Marketplace integration.
-After updating, restart Home Assistant. Existing config entries are retained.
+1. Back up Home Assistant. Install the repository as a custom HACS integration or copy `custom_components/duet_rrf` into HA `/config/custom_components/`.
+2. Restart HA. Existing config entries and dynamic entity IDs are preserved as far as possible.
+3. The integration serves `/duet_rrf/duet-rrf-card.js` and attempts to register it automatically as a Lovelace JavaScript module in storage mode. If your dashboard uses YAML resources or automatic registration fails, add this URL manually under dashboard resources.
+4. Add a manual card:
 
-## Known limitations
-- Supports RRF 3 standalone `/rr_connect` and `/rr_model`; SBC mode is
-  not implemented.
-- Some object-model fields differ between RRF versions and devices.
-- Multi-material systems are represented only where their tools and
-  associated data are exposed by RRF; specialized material changer
-  workflows are not implemented.
-- No active movement or heating controls are provided.
-- Extra tachometer sensors may be `unknown` when not physically connected.
-- Untested against multiple physical printer configurations.
-- Do not expose printer HTTP endpoints to the public internet.
+```yaml
+type: custom:duet-rrf-card
+title: Voron
+entry_id: YOUR_DUET_CONFIG_ENTRY_ID
+status_entity: sensor.duet_status
+heater_entities:
+  - sensor.duet_heater_0_temperature
+  - sensor.duet_heater_1_temperature
+columns:
+  mobile: 2
+  tablet: 4
+  desktop: 6
+blocks:
+  - id: status
+    kind: entity
+    label: Printer status
+    entity: sensor.duet_status
+    w: 2
+    h: 1
+  - id: webcam
+    kind: camera
+    label: Camera
+    entity: camera.your_camera
+    w: 3
+    h: 3
+  - id: power
+    kind: power
+    label: Printer power
+    entity: switch.your_printer_plug
+    w: 2
+    h: 1
+```
 
-## Source
-https://github.com/Danbel988/ha-duet-rrf
+**Resource installation:** The bundled JavaScript is served directly from the integration at `/duet_rrf/duet-rrf-card.js`. The integration attempts automatic Lovelace storage-mode registration. In YAML-managed dashboards, add the URL manually as a JavaScript module.
 
-## v0.2.2 additional fixes
-- Migrate legacy X/Y/Z entities to dynamic axis sensors, preserving original entity IDs where possible.
-- Publish a normal GitHub release (not pre-release) so Marketplace can prefer semantic version tags.
-- Retain existing v0.2.1 sensor and tachometer fixes.
+**Editor:** Choose the card in the Lovelace card picker, add/remove blocks, select HA entities, drag to reorder blocks, and select mobile/tablet/desktop to configure independent block order and dimensions. Customize each block background, text color, padding and radius. Width and height are grid units, not absolute pixels.
+
+## Safety / limitations
+
+- **Experimental preview, not production-tested** on physical printers or multiple HA versions.
+- `M0` for cancel may behave differently depending on printer macros and firmware; test without a live print first.
+- Power-off is blocked **in the custom card** unless the configured status sensor is `idle`, at least one heater sensor is configured, and **all** configured heaters read below 50°C. This is a UI safeguard only; Home Assistant can still switch the plug elsewhere. Never rely on this as a hardware safety interlock.
+- G-code and macros can be dangerous. Their use requires opt-in; do not expose HA or the printer HTTP API publicly.
+- Dashboard blocks can be reordered and resized independently for mobile, tablet and desktop. Pixel-perfect free placement, icon picker, macro selection caching, and advanced camera handling are **not yet implemented**. Automatic resource registration is best-effort; YAML-managed resources require manual setup.
+- The card may need manual entity IDs and the config-entry ID. Some object-model fields may be absent on older RRF versions; unavailable values show unknown.
+- No SBC/DSF support.
+
+Source: https://github.com/Danbel988/ha-duet-rrf

@@ -10,4 +10,4 @@ class DuetPrinting(DuetEntity, BinarySensorEntity):
         super().__init__(entry, 'printing')
     @property
     def is_on(self):
-        return self.coordinator.data.get('state',{}).get('status') in ('processing', 'printing', 'simulating')
+        return (self.coordinator.data or {}).get('state', {}).get('status') in ('processing', 'printing', 'simulating')

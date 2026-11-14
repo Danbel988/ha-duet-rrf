@@ -1,0 +1,45 @@
+send_gcode:
+  name: Send G-code
+  description: Send one G-code line. Requires enabling G-code console in the integration options.
+  fields:
+    entry_id:
+      required: true
+      selector:
+        text:
+    gcode:
+      required: true
+      selector:
+        text:
+printer_control:
+  name: Printer control
+  description: Pause, resume or cancel a print. Requires printer control enabled.
+  fields:
+    entry_id:
+      required: true
+      selector:
+        text:
+    action:
+      required: true
+      selector:
+        select:
+          options: [pause, resume, cancel]
+run_macro:
+  name: Run macro
+  description: Run an existing top-level .g macro. Requires printer control enabled.
+  fields:
+    entry_id:
+      required: true
+      selector:
+        text:
+    name:
+      required: true
+      selector:
+        text:
+list_macros:
+  name: List macros
+  description: List available top-level Duet macros.
+  fields:
+    entry_id:
+      required: true
+      selector:
+        text:

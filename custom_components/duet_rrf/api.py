@@ -1,4 +1,4 @@
-"""Async client for RepRapFirmware 3 standalone HTTP API."""
+"""RepRapFirmware 3 standalone HTTP client. No SBC/DSF support."""
 import asyncio
 import aiohttp
 
@@ -6,19 +6,19 @@ class DuetError(Exception):
     """Duet communication failure."""
 
 class DuetClient:
-    def __init__(self, session, host, port=80, password="", use_ssl=False):
+    def __init__(self, session, host, port=80, password='', use_ssl=False):
         self.session = session
         self.base = f"{'https' if use_ssl else 'http'}://{host}:{port}"
         self.password = password
         self.headers = {}
         self.lock = asyncio.Lock()
 
-    async def _request(self, endpoint, params=None):
+    async def _request(self, endpoint, params=None, raw=False):
         try:
             async with self.session.get(self.base + endpoint, params=params, headers=self.headers,
-                                        timeout=aiohttp.ClientTimeout(total=12)) as response:
+                                        timeout=aiohttp.ClientTimeout(total=15)) as response:
                 response.raise_for_status()
-                return await response.json(content_type=None)
+                return await response.text() if raw else await response.json(content_type=None)
         except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as exc:
             raise DuetError(str(exc)) from exc
 
@@ -43,19 +43,27 @@ class DuetClient:
                 await self.connect()
 
     async def snapshot(self):
-        # Serial requests reduce load on memory-constrained standalone Duets.
+        # Serial reads keep memory usage low on older Duet WiFi boards.
         return {key: await self.model(key) for key in ('state', 'move', 'heat', 'job', 'fans', 'tools')}
 
     async def command(self, gcode):
-        # Never exposed as an arbitrary user-controlled service.
         async with self.lock:
-            try:
-                async with self.session.get(self.base + '/rr_gcode', params={'gcode': gcode},
-                                            headers=self.headers,
-                                            timeout=aiohttp.ClientTimeout(total=12)) as resp:
-                    resp.raise_for_status()
-                    data = await resp.json(content_type=None)
+            for attempt in range(2):
+                try:
+                    data = await self._request('/rr_gcode', {'gcode': gcode})
                     if data.get('err', 0) != 0:
                         raise DuetError(f'G-code rejected: {data}')
-            except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as exc:
-                raise DuetError(str(exc)) from exc
+                    # rr_reply consumes the firmware reply buffer; do not silently claim success.
+                    return await self._request('/rr_reply', raw=True)
+                except DuetError:
+                    if attempt:
+                        raise
+                    # A command may already have been executed; NEVER retry automatically.
+                    raise
+
+    async def list_macros(self):
+        data = await self._request('/rr_filelist', {'dir': '0:/macros'})
+        if data.get('err', 0) != 0:
+            raise DuetError('Cannot list macros')
+        return sorted(item['name'] for item in data.get('files', [])
+                      if isinstance(item, dict) and item.get('type') == 'f' and item.get('name'))
