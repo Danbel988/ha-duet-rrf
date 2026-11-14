@@ -11,7 +11,7 @@ def test_python_syntax():
         ast.parse(path.read_text(encoding='utf-8'))
 
 def test_manifest_version():
-    assert json.loads((COMPONENT / 'manifest.json').read_text())['version'] == '0.3.2'
+    assert json.loads((COMPONENT / 'manifest.json').read_text())['version'] == '0.3.3'
 
 def test_card_present():
     js = (COMPONENT / 'www' / 'duet-rrf-card.js').read_text()
