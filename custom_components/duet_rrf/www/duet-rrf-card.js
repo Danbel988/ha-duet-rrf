@@ -1,4 +1,4 @@
-/* Duet RRF Card 0.3.0 - standalone custom Lovelace card, no external dependencies. */
+/* Duet RRF Card 0.3.2 - dark responsive printer cockpit, no external dependencies. */
 const TYPES = ['entity','camera','power','gcode','control','macro','heading','light','button','spacer'];
 const esc = s => String(s ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const defaults = () => ({type:'custom:duet-rrf-card',title:'Duet RRF',entry_id:'',status_entity:'',heater_entities:[],
@@ -26,41 +26,52 @@ class DuetRrfCard extends HTMLElement {
     const st=this._state(b.entity),on=st?.state==='on';
     return `<div class="value">${esc(st?.state||'unavailable')}</div><button data-act="power" data-id="${esc(b.id)}" ${!st||!['on','off'].includes(st.state)?'disabled':''}>${on?'Turn off':'Turn on'}</button>`;
   }
+  _num(entity){const n=Number(this._state(entity)?.state);return Number.isFinite(n)?n:null;}
+  _text(entity){const st=this._state(entity);return !st||['unknown','unavailable'].includes(st.state)?'—':st.state;}
+  _icon(kind){return ({camera:'◉',power:'⏻',entity:'▣',control:'⌘',macro:'▤',gcode:'›_',light:'◈',button:'●',heading:'◆'})[kind]||'◈';}
+  _progress(value){const n=Number(value);return Number.isFinite(n)?Math.max(0,Math.min(100,n)):0;}
+  _related(suffix){const prefix=(this.config.status_entity||'').replace(/status$/,'');return prefix?prefix+suffix:'';}
   _block(b){
-    const st=this._state(b.entity),kind=b.kind||'entity';
+    const kind=b.kind||'entity',state=this._state(b.entity),value=this._text(b.entity),unit=state?.attributes?.unit_of_measurement||'';
     if(kind==='spacer')return '';
-    if(kind==='light'||kind==='button')return `<div class="value">${esc(st?.state||'unavailable')}</div><button data-act="toggle" data-id="${esc(b.id)}" ${!st?'disabled':''}>${kind==='button'?'Press':st?.state==='on'?'Turn off':'Turn on'}</button>`;
-    if(kind==='heading')return `<h3>${esc(b.label||'Heading')}</h3>`;
-    if(kind==='entity')return `<div class="value">${esc(st?.state||'—')} ${esc(st?.attributes?.unit_of_measurement||'')}</div><small>${esc(b.entity||'Select entity in editor')}</small>`;
-    if(kind==='camera')return b.entity ? `<div class="camera" data-camera="${esc(b.entity)}"></div>` : '<small>Select a camera entity</small>';
-    if(kind==='power')return this._power(b);
-    if(kind==='gcode')return `<input data-gcode="${esc(b.id)}" placeholder="Single G-code line"/><button data-act="gcode" data-id="${esc(b.id)}">Send G-code</button><pre class="reply" data-reply="${esc(b.id)}"></pre>`;
-    if(kind==='control')return `<div class="buttons">${['pause','resume','cancel'].map(a=>`<button data-act="${a}" data-id="${esc(b.id)}">${a}</button>`).join('')}</div>`;
-    if(kind==='macro')return `<button data-act="macros" data-id="${esc(b.id)}">Load macros</button><div data-macros="${esc(b.id)}"></div>`;
+    if(kind==='heading')return `<div class="section-heading">${esc(b.label||'Abschnitt')}</div>`;
+    if(kind==='camera')return b.entity?`<div class="camera" data-camera="${esc(b.entity)}"></div>`:'<div class="empty">Kamera auswählen</div>';
+    if(kind==='power')return `<div class="power-row"><div><div class="metric ${value==='on'?'ok':''}">${value==='on'?'EINGESCHALTET':value==='off'?'AUSGESCHALTET':'—'}</div><div class="sub">${esc(b.entity)}</div></div><button class="action power-button" data-act="power" data-id="${esc(b.id)}" ${!state||!['on','off'].includes(state.state)?'disabled':''}>${value==='on'?'Ausschalten':'Einschalten'}</button></div>`;
+    if(kind==='light'||kind==='button')return `<div class="metric">${esc(value)}</div><button class="action" data-act="toggle" data-id="${esc(b.id)}" ${!state?'disabled':''}>${kind==='button'?'Ausführen':value==='on'?'Ausschalten':'Einschalten'}</button>`;
+    if(kind==='gcode')return `<div class="console"><div class="console-input"><span class="prompt">&gt;</span><input data-gcode="${esc(b.id)}" placeholder="G-Code eingeben …" autocomplete="off" spellcheck="false"/><button class="action primary" data-act="gcode" data-id="${esc(b.id)}">Senden</button></div><pre class="reply" data-reply="${esc(b.id)}">Bereit · einzelne G-Code-Zeile</pre></div>`;
+    if(kind==='control')return `<div class="controls"><button class="action primary" data-act="pause" data-id="${esc(b.id)}">Ⅱ Pause</button><button class="action" data-act="resume" data-id="${esc(b.id)}">▶ Fortsetzen</button><button class="action danger" data-act="cancel" data-id="${esc(b.id)}">■ Abbrechen</button></div>`;
+    if(kind==='macro')return `<div class="macro-area"><button class="action" data-act="macros" data-id="${esc(b.id)}">↻ Makros laden</button><div class="macro-list" data-macros="${esc(b.id)}"></div></div>`;
+    if(kind==='entity'){
+      const id=b.entity||'';
+      if(id.endsWith('print_progress')){const pct=this._progress(value);return `<div class="metric accent">${value==='—'?'—':esc(value)+' %'}</div><div class="track"><div class="fill" style="width:${pct}%"></div></div><div class="sub">Druckfortschritt</div>`;}
+      if(/heater_[01]_temperature$/.test(id)){
+        const target=this._num(id.replace('_temperature','_target'));
+        const current=this._num(id);const pct=current===null?0:Math.max(0,Math.min(100,current/300*100));
+        return `<div class="temp-row"><div class="metric warm">${esc(value)}<span class="unit">°C</span></div><div class="temp-target">SOLL<br><strong>${target===null?'—':target+'°'}</strong></div></div><div class="track heat"><div class="fill" style="width:${pct}%"></div></div>`;
+      }
+      if(/_position$/.test(id))return `<div class="metric compact">${esc(value)}<span class="unit">${esc(unit||'mm')}</span></div>`;
+      if(/fan_\d+_speed$/.test(id))return `<div class="metric compact">${esc(value)}<span class="unit">${esc(unit||'%')}</span></div><div class="track"><div class="fill" style="width:${this._progress(value)}%"></div></div>`;
+      if(id.endsWith('_status'))return `<div class="status-pill ${value==='idle'?'idle':value==='processing'?'printing':''}"><span class="dot"></span>${esc(value==='idle'?'Bereit · Leerlauf':value)}</div>`;
+      return `<div class="metric ${value==='—'?'muted':''}">${esc(value)}${unit?`<span class="unit">${esc(unit)}</span>`:''}</div>`;
+    }
     return '';
   }
   render(){
     if(!this.config||!this.isConnected)return;
-    const cols=this._columns();
-    const blocks=this._orderedBlocks();
+    const cols=Math.max(1,Number(this._columns())||2),blocks=this._orderedBlocks();
+    const status=this._text(this.config.status_entity);
+    const progress=this._text(this._related('print_progress'));
+    const heaters=this.config.heater_entities||[];
+    const cameraNodes=new Map([...this.querySelectorAll('[data-camera]')].map(el=>[el.dataset.camera,el.firstElementChild]).filter(x=>x[1]&&x[1].tagName==='HA-CAMERA-STREAM'));
     this.innerHTML=`<style>
-      :host{display:block;color:var(--primary-text-color)}ha-card{padding:14px;background:var(--ha-card-background,var(--card-background-color));border-radius:var(--ha-card-border-radius,12px)}
-      .grid{display:grid;grid-template-columns:repeat(${cols},minmax(0,1fr));grid-auto-rows:minmax(72px,auto);gap:${Number(this.config.gap)||10}px}
-      .tile{min-width:0;overflow:hidden;background:var(--secondary-background-color);border-radius:${Number(this.config.radius)||12}px;padding:12px;box-sizing:border-box}
-      .tile h4{margin:0 0 8px;font-size:14px}.value{font-size:20px;font-weight:600;overflow-wrap:anywhere}small{opacity:.7;overflow-wrap:anywhere}
-      button{cursor:pointer;border:1px solid var(--divider-color);background:var(--card-background-color);color:var(--primary-text-color);padding:7px 10px;border-radius:8px;margin:4px 4px 0 0}button:disabled{opacity:.45;cursor:not-allowed}
-      input{width:100%;box-sizing:border-box;background:var(--card-background-color);color:var(--primary-text-color);border:1px solid var(--divider-color);padding:9px;border-radius:6px}
-      .camera{width:100%;height:100%;min-height:120px}.camera ha-camera-stream{width:100%;height:100%;display:block}pre{white-space:pre-wrap;overflow-wrap:anywhere}
-    </style><ha-card><h3>${esc(this.config.title||'Duet RRF')}</h3><div class="grid">${blocks.map(b=>{
-      const width=Math.min(cols,Math.max(1,Number(this._dimension(b,'w'))||1));const height=Math.max(1,Number(this._dimension(b,'h'))||1);
-      return `<section class="tile" style="grid-column:span ${width};grid-row:span ${height};${b.background?'background:'+esc(b.background)+';':''}${b.radius!==undefined?'border-radius:'+Math.max(0,Number(b.radius)||0)+'px;':''}${b.padding!==undefined?'padding:'+Math.max(0,Number(b.padding)||0)+'px;':''}${b.color?'color:'+esc(b.color)+';':''}" data-block="${esc(b.id)}"><h4>${esc(b.label||b.kind)}</h4>${this._block(b)}</section>`;
-    }).join('')}</div></ha-card>`;
-    for(const el of this.querySelectorAll('[data-camera]')){
-      const id=el.dataset.camera;
-      if(this._hass?.states?.[id]){
-        const camera=document.createElement('ha-camera-stream');camera.hass=this._hass;camera.entityid=id;camera.controls=true;el.append(camera);
-      }else el.textContent='Camera unavailable';
-    }
+      :host{display:block;--duet-bg:#10151d;--duet-panel:#1b2430;--duet-border:#303d4e;--duet-text:#f1f6fc;--duet-muted:#95a8bc;--duet-accent:#26b9ec;--duet-green:#39d4a1;--duet-orange:#ffb454;color:var(--duet-text);font-family:Inter,Roboto,Arial,sans-serif}
+      *{box-sizing:border-box}ha-card{background:var(--duet-bg);color:var(--duet-text);padding:18px;border-radius:18px;border:1px solid #293442;box-shadow:0 12px 36px #0002;overflow:hidden}
+      .hero{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 18px;flex-wrap:wrap}.brand{display:flex;gap:12px;align-items:center}.brand-icon{width:44px;height:44px;border:1px solid #36546a;border-radius:13px;display:grid;place-items:center;background:#173044;color:var(--duet-accent);font-size:25px}.eyebrow{font-size:10px;font-weight:800;letter-spacing:2px;color:var(--duet-accent);margin-bottom:3px}.hero h2{font-size:21px;letter-spacing:-.5px;margin:0;font-weight:750}.hero-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.live{font-size:11px;color:var(--duet-muted);font-weight:650}.live .dot{display:inline-block;margin-right:7px}.mini-progress{font-size:12px;color:var(--duet-muted);padding:8px 12px;border:1px solid var(--duet-border);border-radius:9px;background:#19222e}
+      .grid{display:grid;grid-template-columns:repeat(${cols},minmax(0,1fr));grid-auto-rows:minmax(66px,auto);gap:${Math.max(4,Number(this.config.gap)||10)}px;align-items:stretch}.tile{position:relative;min-width:0;min-height:0;overflow:hidden;background:linear-gradient(155deg,#202b39,#19222e);border:1px solid var(--duet-border);border-radius:${Math.max(6,Number(this.config.radius)||14)}px;padding:14px;display:flex;flex-direction:column;gap:8px;box-shadow:inset 0 1px #ffffff08}.tile:has(.camera){padding:0}.tile:has(.camera) .tile-title{padding:13px 14px 0}.tile:has(.camera) .camera{flex:1;min-height:170px}.tile-title{display:flex;align-items:center;gap:8px;min-width:0;font-size:11px;font-weight:800;letter-spacing:.55px;text-transform:uppercase;color:#b4c7d8}.tile-title .glyph{color:var(--duet-accent);font-size:14px}.tile-title span:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.metric{font-size:clamp(20px,2.4vw,33px);font-weight:750;line-height:1.12;overflow-wrap:anywhere;font-variant-numeric:tabular-nums;letter-spacing:-.7px}.metric.compact{font-size:25px}.metric.accent{color:var(--duet-accent)}.metric.warm{color:#ffd08b}.metric.ok{color:var(--duet-green)}.metric.muted{color:var(--duet-muted)}.unit{font-size:.5em;color:var(--duet-muted);font-weight:600;margin-left:5px}.sub{font-size:10px;color:var(--duet-muted);overflow-wrap:anywhere}.track{height:6px;width:100%;border-radius:999px;background:#0e1721;overflow:hidden;margin-top:auto}.fill{height:100%;border-radius:999px;background:linear-gradient(90deg,#137aa9,#31c9f4);transition:width .5s}.track.heat .fill{background:linear-gradient(90deg,#f0a04d,#ffcf7d)}.temp-row{display:flex;justify-content:space-between;align-items:center;gap:5px}.temp-target{text-align:right;font-size:9px;color:var(--duet-muted);line-height:1.4}.temp-target strong{font-size:15px;color:#d7e4f1}.status-pill{display:inline-flex;align-items:center;gap:8px;border:1px solid #385b53;color:var(--duet-green);background:#183b34;border-radius:9px;padding:10px 12px;font-size:13px;font-weight:700;align-self:flex-start}.dot{display:inline-block;width:7px;height:7px;background:var(--duet-green);border-radius:50%;box-shadow:0 0 10px #39d4a155}.status-pill.printing{color:var(--duet-accent);background:#16364b;border-color:#315975}.status-pill.printing .dot{background:var(--duet-accent)}
+      .camera{position:relative;background:#0a0e14;overflow:hidden}.camera ha-camera-stream{width:100%;height:100%;min-height:170px;display:block;object-fit:contain}.empty{color:var(--duet-muted);font-size:12px}.power-row{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}.power-row .metric{font-size:15px}.action{cursor:pointer;background:#28394a;color:var(--duet-text);border:1px solid #476077;padding:10px 13px;border-radius:9px;font-size:12px;font-weight:700;transition:background .15s}.action:hover{background:#344c62}.action.primary{background:#136e9a;border-color:#258ab9}.action.danger{background:#4c2831;border-color:#a65b68;color:#ffb6bd}.action:disabled{opacity:.4;cursor:not-allowed}.controls{display:flex;gap:8px;flex-wrap:wrap}.macro-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.macro-list button{background:#26384a;border:1px solid #476077;color:white;border-radius:8px;padding:8px;cursor:pointer}.console{display:flex;flex-direction:column;flex:1;min-height:0}.console-input{display:flex;align-items:center;gap:8px;background:#0e1620;padding:8px;border:1px solid #34475a;border-radius:9px}.prompt{color:var(--duet-green);font-weight:800}.console input{background:transparent;color:#f1f6fc;border:0;outline:none;min-width:0;flex:1;font:12px monospace}.reply{white-space:pre-wrap;overflow-wrap:anywhere;overflow:auto;color:#8faac0;font:11px/1.5 monospace;min-height:25px;max-height:140px}.section-heading{font-size:16px;font-weight:800;color:var(--duet-text)}.footer{margin-top:13px;color:#667d90;font-size:10px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+      @media(max-width:550px){ha-card{padding:10px;border-radius:13px}.hero{margin:4px 2px 14px}.hero h2{font-size:18px}.brand-icon{width:38px;height:38px}.tile{padding:11px}.metric{font-size:23px}.controls .action{flex:1}.power-row .action{width:100%}}
+    </style><ha-card><header class="hero"><div class="brand"><div class="brand-icon">⬡</div><div><div class="eyebrow">DUET · REPRAPFIRMWARE</div><h2>${esc(this.config.title||'Voron Cockpit')}</h2></div></div><div class="hero-right"><span class="live"><span class="dot"></span>${esc(status==='—'?'Verbindung prüfen':status==='idle'?'Bereit':'Status: '+status)}</span><span class="mini-progress">${progress==='—'?'Kein Druck aktiv':esc(progress)+' % abgeschlossen'}</span></div></header><div class="grid">${blocks.map(b=>{const width=Math.min(cols,Math.max(1,Number(this._dimension(b,'w'))||1)),height=Math.max(1,Number(this._dimension(b,'h'))||1);return `<section class="tile" style="grid-column:span ${width};grid-row:span ${height};${b.background?'background:'+esc(b.background)+';':''}${b.radius!==undefined?'border-radius:'+Math.max(0,Number(b.radius)||0)+'px;':''}${b.padding!==undefined?'padding:'+Math.max(0,Number(b.padding)||0)+'px;':''}${b.color?'color:'+esc(b.color)+';':''}" data-block="${esc(b.id)}"><div class="tile-title"><span class="glyph">${this._icon(b.kind)}</span><span>${esc(b.label||b.kind)}</span></div>${this._block(b)}</section>`;}).join('')}</div><div class="footer"><span>VORON · DRUCKERÜBERSICHT</span><span>Duet RRF Dashboard v0.3.2</span></div></ha-card>`;
+    for(const el of this.querySelectorAll('[data-camera]')){const id=el.dataset.camera;if(!this._hass?.states?.[id]){el.textContent='Kamera nicht verfügbar';continue;}let camera=cameraNodes.get(id);if(!camera){camera=document.createElement('ha-camera-stream');camera.entityid=id;camera.controls=true;}camera.hass=this._hass;el.append(camera);}
     this.querySelectorAll('[data-act]').forEach(btn=>btn.addEventListener('click',()=>this._act(btn)));
   }
   async _act(btn){

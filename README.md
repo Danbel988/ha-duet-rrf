@@ -1,3 +1,11 @@
+# Duet RRF v0.3.2
+
+**Dark Cockpit UI release.** This update redesigns the custom Lovelace card with a dark anthracite theme, status header, progress bars, temperature gauges, compact axes/fans, live camera, controls, macros, G-code console and printer power. It retains the responsive block editor (per-device layout, reorder, dimensions, entity selection) and the v0.3.1 unload fix.
+
+**Upgrade:** install this ZIP using your existing Git repository, push to GitHub, publish a GitHub release, then update via HACS and restart Home Assistant. Refresh browser cache to reload `/duet_rrf/duet-rrf-card.js`.
+
+**Note:** temperature bars are instantaneous relative scales, not historical graphs. Control and G-code services require the relevant integration options. Printer power-off is blocked unless printer status is `idle`, heater temperature entities are available and below 50 °C, and user confirms. The UI has not been verified in the user’s browser.
+
 # Duet RepRapFirmware for Home Assistant — v0.3.1 (bugfix; hardware test pending)
 
 **Standalone RepRapFirmware 3 only.** SBC/DSF is intentionally out of scope.
