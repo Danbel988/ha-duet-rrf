@@ -1,31 +1,42 @@
-# Duet RepRapFirmware – Home Assistant (technical preview 0.1.0)
+# Duet RepRapFirmware for Home Assistant — v0.2.1 (pre-release)
 
-Community prototype for **RepRapFirmware 3 standalone HTTP mode** (Duet WiFi / Ethernet). Not affiliated with Duet3D. **Not yet validated on hardware or approved for marketplace publication.**
+A printer-model-independent, read-only Home Assistant integration for
+RepRapFirmware 3 in standalone HTTP mode. This is a community project,
+not affiliated with Duet3D.
 
-## Installation
-Copy `custom_components/duet_rrf` into the Home Assistant `/config/custom_components/` directory. Restart Home Assistant. Add integration **Duet RepRapFirmware** from Settings → Devices & services → Add integration. Enter IP/hostname, port, password, optional HTTPS, poll interval (5–300 s). Multiple Duets supported.
+## Dynamic discovery
+The integration discovers available RRF axes, heaters, temperature sensors,
+fans and tools from the firmware object model. It does not assume a specific
+printer brand, fixed hotend count or fixed bed/heater index.
 
-## Telemetry
-Status, persistent build-plate offset (if global.plattenOffset exists), X/Y/Z user positions, bed/nozzle current and target temperatures, print filename, elapsed print time, progress, printing state. Uses `/rr_connect` and `/rr_model`. No arbitrary G-code or filesystem services. Default mode is read-only.
+Newly discovered hardware is added on subsequent coordinator updates.
+Entity identifiers are based on RRF array indices, so reordering firmware
+hardware may require checking dashboard entity references.
 
-## Limitations and safety
-- **Preview only.** The movement-control option creates buttons but presses deliberately raise a safety error: actual jog commands are **not implemented**. Do not enable it for production.
-- Sensors assume heater index 0 is bed and heater index 1 is nozzle. This is common but not universal; dynamic heater mapping is planned.
-- Print-progress fields vary between firmware versions; missing values show unavailable.
-- RepRapFirmware SBC mode `/machine/*` is not supported in this preview.
-- HTTP authentication is not encryption. Use a trusted local network; HTTPS only if your Duet endpoint genuinely supports it. Never expose the device to the internet.
-- No commands that heat, home, move, pause, cancel, or edit files are sent by this version.
-- The existing user's HA shell-command bridge remains independent and unchanged.
+## v0.2.1 changes
+- Retires legacy fixed Bed/Nozzle and custom build-plate-offset entities
+  from the Home Assistant entity registry during integration setup.
+  Existing dashboards referring to those entities may need to be updated.
+- Negative RPM values (RRF's unavailable tachometer reading) now return
+  `unknown` rather than showing `-1 rpm`.
+- Preserves dynamic heater, sensor, axis, tool and fan discovery from v0.2.0.
+- Updates the manifest version to 0.2.1.
 
-## Developer validation
-Run `python -m compileall custom_components/duet_rrf` and test in a dedicated Home Assistant environment. Follow with real-device read-only validation, Home Assistant integration tests, hassfest, HACS validation, and security review before publishing.
+## Install/update
+Install this repository as a custom HACS/Marketplace integration.
+After updating, restart Home Assistant. Existing config entries are retained.
 
-## Official API references
-https://github.com/Duet3D/RepRapFirmware/wiki/HTTP-requests
-https://duet3d.github.io/DuetSoftwareFramework/articles/rest-api.html
+## Known limitations
+- Supports RRF 3 standalone `/rr_connect` and `/rr_model`; SBC mode is
+  not implemented.
+- Some object-model fields differ between RRF versions and devices.
+- Multi-material systems are represented only where their tools and
+  associated data are exposed by RRF; specialized material changer
+  workflows are not implemented.
+- No active movement or heating controls are provided.
+- Extra tachometer sensors may be `unknown` when not physically connected.
+- Untested against multiple physical printer configurations.
+- Do not expose printer HTTP endpoints to the public internet.
 
-## Repository
-https://github.com/Danbel988/ha-duet-rrf
-
-## Repository
+## Source
 https://github.com/Danbel988/ha-duet-rrf

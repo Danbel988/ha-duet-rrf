@@ -4,6 +4,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.helpers import entity_registry as er
 from .api import DuetClient, DuetError
 from .const import *
 
@@ -24,6 +25,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         update_interval=timedelta(seconds=cfg.get(CONF_SCAN, DEFAULT_SCAN)))
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = {'client': client, 'coordinator': coordinator, 'control': cfg.get(CONF_CONTROL, False)}
+    # Retire only legacy 0.1.x entities with known unique IDs.
+    # New dynamic heater entities are not touched.
+    registry = er.async_get(hass)
+    legacy_keys = ('bed_actual', 'bed_target', 'nozzle_actual', 'nozzle_target', 'plate_offset')
+    for key in legacy_keys:
+        entity_id = registry.async_get_entity_id('sensor', DOMAIN, f'{entry.entry_id}_{key}')
+        if entity_id:
+            registry.async_remove(entity_id)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(async_update_options))
     return True

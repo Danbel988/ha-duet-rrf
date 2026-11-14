@@ -77,6 +77,8 @@ class DuetSensor(DuetEntity, SensorEntity):
     @property
     def native_value(self):
         value = at(self.coordinator.data or {}, *self.path)
+        if self.key.endswith('_rpm') and isinstance(value, (int, float)) and value < 0:
+            return None  # RRF uses negative RPM when no tachometer reading is available.
         if self.key == 'progress' and isinstance(value, (float, int)):
             return round(value * 100, 1)
         if self.key.startswith('fan_') and self.key.endswith('_speed') and isinstance(value, (float, int)):
