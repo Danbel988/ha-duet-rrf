@@ -44,7 +44,7 @@ class DuetClient:
 
     async def snapshot(self):
         # Serial requests reduce load on memory-constrained standalone Duets.
-        return {key: await self.model(key) for key in ('state', 'move', 'heat', 'job', 'fans', 'global')}
+        return {key: await self.model(key) for key in ('state', 'move', 'heat', 'job', 'fans', 'tools')}
 
     async def command(self, gcode):
         # Never exposed as an arbitrary user-controlled service.
