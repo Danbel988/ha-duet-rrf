@@ -22,4 +22,4 @@
 - RRF model/command integration tests and real camera rendering remain unverified.
 
 ## Upgrade
-Copy the archive contents into your repository, push and publish the tag/release. Update in HACS, restart Home Assistant, and refresh frontend cache. Existing Lovelace dashboards are not overwritten.
+Existing Lovelace dashboards are not overwritten.
